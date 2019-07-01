@@ -1,0 +1,1020 @@
+//====================================================
+//Battle_Player_MP.cpp
+//====================================================
+#include "main.h"
+#include "game.h"
+#include "Battle_Player_MP.h"
+#include "Battle_Player.h"
+#include "Battle_Player_HP.h"
+//*****************************************************************************
+// マクロ定義
+//*****************************************************************************
+#define BATTLE_PLAYER_MP_CAGE_SIZE		(15.0f)
+#define BATTLE_PLAYER_MP_CAGE_POS_X		(BATTLE_PLAYER_HP_POS_X)
+#define BATTLE_PLAYER_MP_CAGE_POS_Y		(BATTLE_PLAYER_HP_POS_Y - BATTLE_PLAYER_MP_CAGE_SIZE)
+
+#define BATTLE_PLAYER_MP_CAGE_ENTITY_POS_X	(BATTLE_PLAYER_MP_CAGE_POS_X + BATTLE_PLAYER_MP_CAGE_SIZE)
+#define BATTLE_PLAYER_MP_CAGE_ENTITY_POS_Y	(BATTLE_PLAYER_MP_CAGE_POS_Y - BATTLE_PLAYER_MP_CAGE_SIZE * 0.2f)
+#define BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X	(200.0f)
+#define BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y	(BATTLE_PLAYER_MP_CAGE_SIZE * 0.5f)
+#define BATTLE_PLAYER_MP_CAGE_RIGHT_POS		(BATTLE_PLAYER_MP_CAGE_ENTITY_POS_X + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X)
+#define	BATTLE_PLAYER_MP_CAGE_LIGHT_SPEED	(10.0f)
+#define TEXTURE_PLAYER_MP_CAGE_CAGE		("data/TEXTURE/Player_Skill.png")
+#define TEXTURE_PLAYER_MP_CAGE_ENTITY	("data/TEXTURE/CageEntity.png")
+#define TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE	(1.0f / 4.0f)
+#define TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE	(1.0f / 3.0f)
+
+#define TEXTURE_BATTLE_PLAYER_MP_CAGE_NUMBER	("data/TEXTURE/Number_Big.png")
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT	(8)
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X	(8.0f)
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y	(16.0f)
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_POS_X_REC	(BATTLE_PLAYER_MP_CAGE_RIGHT_POS + 3 * BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X)
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE	(1.0f / 10.0f)
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_POS_Y_REC	(BATTLE_PLAYER_MP_CAGE_POS_Y)
+#define BATTLE_PLAYER_MP_CAGE_NUMBER_POS_X_MAX	(BATTLE_PLAYER_MP_CAGE_NUMBER_POS_X_REC - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X * BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT)
+
+//*****************************************************************************
+// プロトタイプ宣言
+//*****************************************************************************
+HRESULT MakeVertexBattle_Player_MP(LPDIRECT3DDEVICE9 pDevice);
+HRESULT MakeVertexBattle_Player_MP_NumRec(LPDIRECT3DDEVICE9 pDevice);
+HRESULT MakeVertexBattle_Player_MP_NumMAX(LPDIRECT3DDEVICE9 pDevice);
+void SetVerTexBattle_Player_MP(void);
+void SetVerTexBattle_Player_MP_NumRec(int ID);
+void SetVerTexBattle_Player_MP_NumMAX(int ID);
+void InitRecMPNumberSingle(int ID);
+void InitMAXMPNumberSingle(int ID);
+
+//*****************************************************************************
+// グローバル変数
+//*****************************************************************************
+LPDIRECT3DTEXTURE9		g_pTextureBattle_Player_MP		= NULL;		// テクスチャへのポインタ
+LPDIRECT3DTEXTURE9		g_pTextureBattle_Player_MP_Entity	= NULL;		// テクスチャへのポインタ
+LPDIRECT3DVERTEXBUFFER9 g_pVtxBuffBattle_Player_MP		= NULL;		// 頂点バッファインターフェースへのポインタ
+
+LPDIRECT3DTEXTURE9		g_pTextureBattle_Player_MP_Num	= NULL;		// テクスチャへのポインタ
+LPDIRECT3DVERTEXBUFFER9 g_pVtxBuffBattle_Player_MP_NumRec	= NULL;		// 頂点バッファインターフェースへのポインタ
+LPDIRECT3DVERTEXBUFFER9 g_pVtxBuffBattle_Player_MP_NumMAX	= NULL;		// 頂点バッファインターフェースへのポインタ
+
+//MP ケージに関する変数宣言
+D3DXVECTOR3	Left_MP_Pos;
+D3DXVECTOR3	Entity_MP_Pos;
+D3DXVECTOR3 OutLine_MP_Pos;
+D3DXVECTOR3	Right_MP_Pos;
+int			nMAXMP_Value;
+float		fSize_per_MP_Value;
+int			nRecMPValue;
+bool		bLight_MP;
+int			MPColorType;
+D3DXVECTOR3	Right_MP_Light_Pos;
+
+
+//MPの数値に関する変数宣言
+typedef struct
+{
+	bool		bUse;
+	D3DXVECTOR3	DrawPos;
+	float		SizeX;
+	float		SizeY;
+	int			nBox;
+}MP_VALUE_D;
+MP_VALUE_D g_PlayerRecMPValue[BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT];
+MP_VALUE_D g_PlayerMAXMPValue[BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT];
+//=============================================================================
+// 初期化処理
+//=============================================================================
+HRESULT InitBattle_Player_MP(void)
+{
+	LPDIRECT3DDEVICE9 pDevice = GetDevice();
+
+	D3DXCreateTextureFromFile(pDevice,
+	TEXTURE_PLAYER_MP_CAGE_CAGE,
+	&g_pTextureBattle_Player_MP);
+
+	D3DXCreateTextureFromFile(pDevice,
+	TEXTURE_PLAYER_MP_CAGE_ENTITY,
+	&g_pTextureBattle_Player_MP_Entity);
+
+	D3DXCreateTextureFromFile(pDevice,
+	TEXTURE_BATTLE_PLAYER_MP_CAGE_NUMBER,
+	&g_pTextureBattle_Player_MP_Num);
+
+	Left_MP_Pos		= D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_POS_X,BATTLE_PLAYER_MP_CAGE_POS_Y,0.0f);
+	Entity_MP_Pos	= D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_ENTITY_POS_X,BATTLE_PLAYER_MP_CAGE_ENTITY_POS_Y,0.0f);
+	OutLine_MP_Pos	= D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_ENTITY_POS_X,BATTLE_PLAYER_MP_CAGE_POS_Y,0.0f);
+	Right_MP_Pos	= D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_RIGHT_POS,BATTLE_PLAYER_MP_CAGE_POS_Y,0.0f);
+	Right_MP_Light_Pos	= D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_POS_X,BATTLE_PLAYER_MP_CAGE_ENTITY_POS_Y,0.0f);
+	nMAXMP_Value			= 0.0f;
+	fSize_per_MP_Value	= 0.0f;
+	nRecMPValue			= 0.0f;
+	bLight_MP			= false;
+	MPColorType		= 0;
+	for(int nCntD = 0; nCntD< BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT;nCntD ++)
+	{
+		InitRecMPNumberSingle(nCntD);
+		InitMAXMPNumberSingle(nCntD);
+	}
+
+
+
+	MakeVertexBattle_Player_MP(pDevice);
+	MakeVertexBattle_Player_MP_NumRec(pDevice);
+	MakeVertexBattle_Player_MP_NumMAX(pDevice);
+	return S_OK;
+}
+void InitRecMPNumberSingle(int ID)
+{
+	g_PlayerRecMPValue[ID].bUse = false;
+	g_PlayerRecMPValue[ID].SizeX = BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X;
+	g_PlayerRecMPValue[ID].SizeY = BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+	g_PlayerRecMPValue[ID].nBox	= 0;
+	g_PlayerRecMPValue[ID].DrawPos = D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_NUMBER_POS_X_REC - ID * (BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X + 2.0f),
+											BATTLE_PLAYER_MP_CAGE_NUMBER_POS_Y_REC,
+											0.0f);
+}
+
+void InitMAXMPNumberSingle(int ID)
+{
+	g_PlayerMAXMPValue[ID].bUse = false;
+	g_PlayerMAXMPValue[ID].SizeX = BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X;
+	g_PlayerMAXMPValue[ID].SizeY = BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+	g_PlayerMAXMPValue[ID].nBox	= 0;
+	g_PlayerMAXMPValue[ID].DrawPos = D3DXVECTOR3(BATTLE_PLAYER_MP_CAGE_NUMBER_POS_X_MAX - ID * BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X,
+											BATTLE_PLAYER_MP_CAGE_NUMBER_POS_Y_REC,
+											0.0f);
+}
+//=============================================================================
+// 終了処理
+//=============================================================================
+void UninitBattle_Player_MP(void)
+{
+	if(g_pTextureBattle_Player_MP != NULL)
+	{// テクスチャの開放
+		g_pTextureBattle_Player_MP->Release();
+		g_pTextureBattle_Player_MP = NULL;
+	}
+	if(g_pTextureBattle_Player_MP_Entity != NULL)
+	{// テクスチャの開放
+		g_pTextureBattle_Player_MP_Entity->Release();
+		g_pTextureBattle_Player_MP_Entity = NULL;
+	}
+	if(g_pVtxBuffBattle_Player_MP != NULL)
+	{// 頂点バッファの開放
+		g_pVtxBuffBattle_Player_MP->Release();
+		g_pVtxBuffBattle_Player_MP = NULL;
+	}
+
+
+	if(g_pTextureBattle_Player_MP_Num != NULL)
+	{// テクスチャの開放
+		g_pTextureBattle_Player_MP_Num->Release();
+		g_pTextureBattle_Player_MP_Num = NULL;
+	}
+	//Buff
+	if(g_pVtxBuffBattle_Player_MP_NumRec != NULL)
+	{// 頂点バッファの開放
+		g_pVtxBuffBattle_Player_MP_NumRec->Release();
+		g_pVtxBuffBattle_Player_MP_NumRec = NULL;
+	}
+	if(g_pVtxBuffBattle_Player_MP_NumMAX != NULL)
+	{// 頂点バッファの開放
+		g_pVtxBuffBattle_Player_MP_NumMAX->Release();
+		g_pVtxBuffBattle_Player_MP_NumMAX = NULL;
+	}
+}
+void SetBattle_Player_MP(void)
+{
+	BATTLE_PLAYER *pPlayer = GetBattlePlayer();
+
+	nMAXMP_Value			= pPlayer->fMaxMP;
+	fSize_per_MP_Value	= (float)BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X / (float)nMAXMP_Value;
+	nRecMPValue			= pPlayer->fRecMP;
+	
+}
+//=============================================================================
+// 更新処理
+//=============================================================================
+void UpdateBattle_Player_MP(void)
+{
+	BATTLE_PLAYER *pPlayer = GetBattlePlayer();
+	nRecMPValue			= pPlayer->fRecMP;
+	nMAXMP_Value			= pPlayer->fMaxMP;
+
+
+	int nBoxRecWk[BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT]	= {};
+	int nBoxMAXWk[BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT]	= {};
+	bool DrawStartRec = false;
+	bool DrawStartMAX = false;
+	int	VisualRec = 0;
+	int VisualMAX = 0;
+	//=====================ワーク配列に値を入れる===============================//
+	for(int nCntIdx = BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT; nCntIdx> 0;nCntIdx --)
+	{
+		int Value = nRecMPValue % (int)(powf(10.0f,nCntIdx))/(int)(powf(10.0f,(nCntIdx-1)));
+		if(Value != 0 )
+			DrawStartRec = true;
+		if(DrawStartRec == true)
+		{
+			nBoxRecWk[nCntIdx-1] = Value;
+			VisualRec++;
+		}
+		else
+		{
+			nBoxRecWk[nCntIdx-1] = 99;
+			if(nCntIdx-1 == 0)
+			{
+				nBoxRecWk[nCntIdx-1] = 0;
+			}
+
+		}
+	}
+	for(int nCntIdx = BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT; nCntIdx> 0;nCntIdx --)
+	{
+		int Value = nMAXMP_Value % (int)(powf(10.0f,nCntIdx))/(int)(powf(10.0f,(nCntIdx-1)));
+		if(Value != 0 )
+			DrawStartMAX = true;
+		if(DrawStartMAX == true)
+		{
+			nBoxMAXWk[nCntIdx-1] = Value;
+			VisualMAX ++;
+		}
+		else
+		{
+			nBoxMAXWk[nCntIdx-1] = 99;
+		}
+	}
+	//======================MAXMPの描画位置を再設定する==============================//
+	for(int nCntD = 0; nCntD< VisualMAX;nCntD ++)
+	{
+		g_PlayerMAXMPValue[nCntD].DrawPos.x = BATTLE_PLAYER_MP_CAGE_NUMBER_POS_X_REC + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X * (VisualMAX+1)
+										- nCntD * (BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X+2.0f);
+	}
+	//=======================それぞれのDの中に数値を入れ,ｂUseを決める=============================//
+	for(int nCntD = 0; nCntD< BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT;nCntD ++)
+	{
+		if(nBoxRecWk[nCntD] == 99)
+		{
+			g_PlayerRecMPValue[nCntD].bUse = false;
+		}
+		else
+		{
+			g_PlayerRecMPValue[nCntD].bUse = true;
+			g_PlayerRecMPValue[nCntD].nBox = nBoxRecWk[nCntD];
+			SetVerTexBattle_Player_MP_NumRec(nCntD);
+		}
+
+		if(nBoxMAXWk[nCntD] == 99)
+		{
+			g_PlayerMAXMPValue[nCntD].bUse = false;
+
+		}
+		else
+		{
+			g_PlayerMAXMPValue[nCntD].bUse = true;
+			g_PlayerMAXMPValue[nCntD].nBox = nBoxMAXWk[nCntD];
+			SetVerTexBattle_Player_MP_NumMAX(nCntD);
+		}	
+	}
+
+	//=====================MPの色を決める===============================//
+	MPColorType = (int)((nRecMPValue-2) / (nMAXMP_Value /3));
+	SetVerTexBattle_Player_MP();
+}
+
+//=============================================================================
+// 描画処理
+//=============================================================================
+void DrawBattle_Player_MP(void)
+{
+	LPDIRECT3DDEVICE9 pDevice = GetDevice();
+
+	//フィールドの描画
+	// 頂点バッファをデバイスのデータストリームにバインド
+	pDevice->SetStreamSource(0, g_pVtxBuffBattle_Player_MP, 0, sizeof(VERTEX_2D));
+
+	// 頂点フォーマットの設定
+	pDevice->SetFVF(FVF_VERTEX_2D);
+
+	pDevice->SetTexture(0,g_pTextureBattle_Player_MP);
+	// ポリゴンの描画
+	//left
+	pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 0, NUM_POLYGON);
+	//bg
+	pDevice->SetTexture(0,NULL);
+	pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 4, NUM_POLYGON);
+
+	//entity
+	pDevice->SetTexture(0,g_pTextureBattle_Player_MP_Entity);
+	pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 8, NUM_POLYGON);
+
+	//outLine
+	pDevice->SetTexture(0,g_pTextureBattle_Player_MP);
+	pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 12, NUM_POLYGON);
+	//Right
+	pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 16, NUM_POLYGON);
+	//light
+	if(bLight_MP == true)
+	pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, 20, NUM_POLYGON);
+
+
+	//数字RECの描画
+	// 頂点バッファをデバイスのデータストリームにバインド
+	pDevice->SetStreamSource(0, g_pVtxBuffBattle_Player_MP_NumRec, 0, sizeof(VERTEX_2D));
+
+	// 頂点フォーマットの設定
+	pDevice->SetFVF(FVF_VERTEX_2D);
+
+	pDevice->SetTexture(0,g_pTextureBattle_Player_MP_Num);
+	// ポリゴンの描画
+	for(int nCntD = 0; nCntD< BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT;nCntD ++)
+	{
+		if(g_PlayerRecMPValue[nCntD].bUse == false)
+			continue;
+		pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, nCntD * 4, NUM_POLYGON);
+	}
+
+	//数字MAXの描画
+	// 頂点バッファをデバイスのデータストリームにバインド
+	pDevice->SetStreamSource(0, g_pVtxBuffBattle_Player_MP_NumMAX, 0, sizeof(VERTEX_2D));
+
+	// 頂点フォーマットの設定
+	pDevice->SetFVF(FVF_VERTEX_2D);
+
+	pDevice->SetTexture(0,g_pTextureBattle_Player_MP_Num);
+	// ポリゴンの描画
+	for(int nCntD = 0; nCntD< BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT;nCntD ++)
+	{
+		if(g_PlayerMAXMPValue[nCntD].bUse == false)
+			continue;
+		pDevice->DrawPrimitive(D3DPT_TRIANGLESTRIP, nCntD * 4, NUM_POLYGON);
+	}
+
+
+}
+//=============================================================================
+// 頂点の設定
+//=============================================================================
+HRESULT MakeVertexBattle_Player_MP_NumRec(LPDIRECT3DDEVICE9 pDevice)
+{
+// オブジェクトの頂点バッファを生成
+	if(FAILED(pDevice->CreateVertexBuffer(sizeof(VERTEX_2D) * NUM_VERTEX * BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT,	// 頂点データ用に確保するバッファサイズ(バイト単位)
+		D3DUSAGE_WRITEONLY,					// 頂点バッファの使用法　
+		FVF_VERTEX_2D,						// 使用する頂点フォーマット
+		D3DPOOL_MANAGED,					// リソースのバッファを保持するメモリクラスを指定
+		&g_pVtxBuffBattle_Player_MP_NumRec,			// 頂点バッファインターフェースへのポインタ
+		NULL)))								// NULLに設定
+	{
+		return E_FAIL;
+	}
+	{	//頂点バッファの中身を埋める
+		VERTEX_2D *pVtx;
+
+		// 頂点データの範囲をロックし、頂点バッファへのポインタを取得
+		g_pVtxBuffBattle_Player_MP_NumRec->Lock(0, 0, (void**)&pVtx, 0);
+		for(int nCntD = 0; nCntD< BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT;nCntD ++,pVtx += 4)
+			{
+				// 頂点座標の設定
+				pVtx[0].pos.x = g_PlayerRecMPValue[nCntD].DrawPos.x; 
+				pVtx[0].pos.y =	g_PlayerRecMPValue[nCntD].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+				pVtx[0].pos.z = 0.0f;
+
+				pVtx[1].pos.x = g_PlayerRecMPValue[nCntD].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X; 
+				pVtx[1].pos.y =	g_PlayerRecMPValue[nCntD].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+				pVtx[1].pos.z = 0.0f;
+
+				pVtx[2].pos.x = g_PlayerRecMPValue[nCntD].DrawPos.x; 
+				pVtx[2].pos.y =	g_PlayerRecMPValue[nCntD].DrawPos.y;
+				pVtx[2].pos.z = 0.0f;
+
+				pVtx[3].pos.x = g_PlayerRecMPValue[nCntD].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X; 
+				pVtx[3].pos.y =	g_PlayerRecMPValue[nCntD].DrawPos.y;
+				pVtx[3].pos.z = 0.0f;
+
+				// rhwの設定
+				pVtx[0].rhw =
+					pVtx[1].rhw =
+					pVtx[2].rhw =
+					pVtx[3].rhw = 1.0f;
+
+				// 頂点カラーの設定
+				pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+				pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+				pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+				pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+				int nBox = g_PlayerRecMPValue[nCntD].nBox;
+				pVtx[0].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,0.0f);
+				pVtx[1].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,0.0f);
+				pVtx[2].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,1.0f);
+				pVtx[3].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,1.0f);
+		}
+		// 頂点データをアンロックする
+		g_pVtxBuffBattle_Player_MP_NumRec->Unlock();
+	}
+	return S_OK;
+}
+HRESULT MakeVertexBattle_Player_MP_NumMAX(LPDIRECT3DDEVICE9 pDevice)
+{
+	// オブジェクトの頂点バッファを生成
+	if(FAILED(pDevice->CreateVertexBuffer(sizeof(VERTEX_2D) * NUM_VERTEX * BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT,	// 頂点データ用に確保するバッファサイズ(バイト単位)
+		D3DUSAGE_WRITEONLY,					// 頂点バッファの使用法　
+		FVF_VERTEX_2D,						// 使用する頂点フォーマット
+		D3DPOOL_MANAGED,					// リソースのバッファを保持するメモリクラスを指定
+		&g_pVtxBuffBattle_Player_MP_NumMAX,			// 頂点バッファインターフェースへのポインタ
+		NULL)))								// NULLに設定
+	{
+		return E_FAIL;
+	}
+	{//頂点バッファの中身を埋める
+		VERTEX_2D *pVtx;
+
+		// 頂点データの範囲をロックし、頂点バッファへのポインタを取得
+		g_pVtxBuffBattle_Player_MP_NumMAX->Lock(0, 0, (void**)&pVtx, 0);
+		for(int nCntD = 0; nCntD< BATTLE_PLAYER_MP_CAGE_NUMBER_DIGIT;nCntD ++,pVtx += 4)
+			{
+				// 頂点座標の設定
+				pVtx[0].pos.x = g_PlayerMAXMPValue[nCntD].DrawPos.x; 
+				pVtx[0].pos.y =	g_PlayerMAXMPValue[nCntD].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+				pVtx[0].pos.z = 0.0f;
+
+				pVtx[1].pos.x = g_PlayerMAXMPValue[nCntD].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X; 
+				pVtx[1].pos.y =	g_PlayerMAXMPValue[nCntD].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+				pVtx[1].pos.z = 0.0f;
+
+				pVtx[2].pos.x = g_PlayerMAXMPValue[nCntD].DrawPos.x; 
+				pVtx[2].pos.y =	g_PlayerMAXMPValue[nCntD].DrawPos.y;
+				pVtx[2].pos.z = 0.0f;
+
+				pVtx[3].pos.x = g_PlayerMAXMPValue[nCntD].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X; 
+				pVtx[3].pos.y =	g_PlayerMAXMPValue[nCntD].DrawPos.y;
+				pVtx[3].pos.z = 0.0f;
+
+				// rhwの設定
+				pVtx[0].rhw =
+					pVtx[1].rhw =
+					pVtx[2].rhw =
+					pVtx[3].rhw = 1.0f;
+
+				// 頂点カラーの設定
+				pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+				pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+				pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+				pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+				int nBox = g_PlayerMAXMPValue[nCntD].nBox;
+				pVtx[0].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,0.0f);
+				pVtx[1].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,0.0f);
+				pVtx[2].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,1.0f);
+				pVtx[3].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,1.0f);
+		}
+		// 頂点データをアンロックする
+		g_pVtxBuffBattle_Player_MP_NumMAX->Unlock();
+	}
+	return S_OK;
+}
+void SetVerTexBattle_Player_MP_NumRec(int ID)
+{
+	//頂点バッファの中身を埋める
+	VERTEX_2D *pVtx;
+
+	// 頂点データの範囲をロックし、頂点バッファへのポインタを取得
+	g_pVtxBuffBattle_Player_MP_NumRec->Lock(0, 0, (void**)&pVtx, 0);
+	pVtx += ID * 4;
+
+		// 頂点座標の設定
+		pVtx[0].pos.x = g_PlayerRecMPValue[ID].DrawPos.x; 
+		pVtx[0].pos.y =	g_PlayerRecMPValue[ID].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y*1.2;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = g_PlayerRecMPValue[ID].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X*1.2; 
+		pVtx[1].pos.y =	g_PlayerRecMPValue[ID].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y*1.2;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = g_PlayerRecMPValue[ID].DrawPos.x; 
+		pVtx[2].pos.y =	g_PlayerRecMPValue[ID].DrawPos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = g_PlayerRecMPValue[ID].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X*1.2; 
+		pVtx[3].pos.y =	g_PlayerRecMPValue[ID].DrawPos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+		pVtx[1].rhw =
+		pVtx[2].rhw =
+		pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		int nBox = g_PlayerRecMPValue[ID].nBox;
+		pVtx[0].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,1.0f);
+		// 頂点データをアンロックする
+	g_pVtxBuffBattle_Player_MP_NumRec->Unlock();
+}
+void SetVerTexBattle_Player_MP_NumMAX(int ID)
+{
+	//頂点バッファの中身を埋める
+	VERTEX_2D *pVtx;
+
+	// 頂点データの範囲をロックし、頂点バッファへのポインタを取得
+	g_pVtxBuffBattle_Player_MP_NumMAX->Lock(0, 0, (void**)&pVtx, 0);
+	pVtx += ID * 4;
+
+		// 頂点座標の設定
+		pVtx[0].pos.x = g_PlayerMAXMPValue[ID].DrawPos.x; 
+		pVtx[0].pos.y =	g_PlayerMAXMPValue[ID].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = g_PlayerMAXMPValue[ID].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X; 
+		pVtx[1].pos.y =	g_PlayerMAXMPValue[ID].DrawPos.y - BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = g_PlayerMAXMPValue[ID].DrawPos.x; 
+		pVtx[2].pos.y =	g_PlayerMAXMPValue[ID].DrawPos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = g_PlayerMAXMPValue[ID].DrawPos.x + BATTLE_PLAYER_MP_CAGE_NUMBER_SIZE_X; 
+		pVtx[3].pos.y =	g_PlayerMAXMPValue[ID].DrawPos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+		pVtx[1].rhw =
+		pVtx[2].rhw =
+		pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		int nBox = g_PlayerMAXMPValue[ID].nBox;
+		pVtx[0].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE * nBox + BATTLE_PLAYER_MP_CAGE_NUMBER_UNIT_SIZE,1.0f);
+		// 頂点データをアンロックする
+	g_pVtxBuffBattle_Player_MP_NumMAX->Unlock();
+}
+HRESULT MakeVertexBattle_Player_MP(LPDIRECT3DDEVICE9 pDevice)
+{
+// オブジェクトの頂点バッファを生成
+	if(FAILED(pDevice->CreateVertexBuffer(sizeof(VERTEX_2D) * NUM_VERTEX * 6,	// 頂点データ用に確保するバッファサイズ(バイト単位)
+		D3DUSAGE_WRITEONLY,					// 頂点バッファの使用法　
+		FVF_VERTEX_2D,						// 使用する頂点フォーマット
+		D3DPOOL_MANAGED,					// リソースのバッファを保持するメモリクラスを指定
+		&g_pVtxBuffBattle_Player_MP,			// 頂点バッファインターフェースへのポインタ
+		NULL)))								// NULLに設定
+	{
+		return E_FAIL;
+	}
+	{//頂点バッファの中身を埋める
+		VERTEX_2D *pVtx;
+
+		// 頂点データの範囲をロックし、頂点バッファへのポインタを取得
+		g_pVtxBuffBattle_Player_MP->Lock(0, 0, (void**)&pVtx, 0);
+
+		//Leftside
+		// 頂点座標の設定
+		pVtx[0].pos.x = Left_MP_Pos.x; 
+		pVtx[0].pos.y =	Left_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Left_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[1].pos.y =	Left_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Left_MP_Pos.x; 
+		pVtx[2].pos.y =	Left_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Left_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[3].pos.y =	Left_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+
+pVtx+= 4;
+		//BG
+		// 頂点座標の設定
+		pVtx[0].pos.x = Entity_MP_Pos.x; 
+		pVtx[0].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Entity_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[1].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Entity_MP_Pos.x; 
+		pVtx[2].pos.y =	Entity_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Entity_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[3].pos.y =	Entity_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+
+pVtx+= 4;
+		//Entity
+		// 頂点座標の設定
+		pVtx[0].pos.x = Entity_MP_Pos.x; 
+		pVtx[0].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Entity_MP_Pos.x + nRecMPValue * fSize_per_MP_Value; 
+		pVtx[1].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Entity_MP_Pos.x; 
+		pVtx[2].pos.y =	Entity_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Entity_MP_Pos.x + nRecMPValue * fSize_per_MP_Value; 
+		pVtx[3].pos.y =	Entity_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+
+pVtx+= 4;
+		//Outline
+		// 頂点座標の設定
+		pVtx[0].pos.x = OutLine_MP_Pos.x; 
+		pVtx[0].pos.y =	OutLine_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = OutLine_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[1].pos.y =	OutLine_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = OutLine_MP_Pos.x; 
+		pVtx[2].pos.y =	OutLine_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = OutLine_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[3].pos.y =	OutLine_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+
+pVtx+= 4;
+		//Right
+		// 頂点座標の設定
+		pVtx[0].pos.x = Right_MP_Pos.x; 
+		pVtx[0].pos.y =	Right_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Right_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[1].pos.y =	Right_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Right_MP_Pos.x; 
+		pVtx[2].pos.y =	Right_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Right_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[3].pos.y =	Right_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+pVtx+= 4;
+		//Light
+		// 頂点座標の設定
+		pVtx[0].pos.x = Right_MP_Light_Pos.x; 
+		pVtx[0].pos.y =	Right_MP_Light_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Right_MP_Light_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[1].pos.y =	Right_MP_Light_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Right_MP_Light_Pos.x; 
+		pVtx[2].pos.y =	Right_MP_Light_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Right_MP_Light_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[3].pos.y =	Right_MP_Light_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+		// 頂点データをアンロックする
+		g_pVtxBuffBattle_Player_MP->Unlock();
+	}
+	return S_OK;
+}
+void SetVerTexBattle_Player_MP(void)
+
+{//頂点バッファの中身を埋める
+		VERTEX_2D *pVtx;
+
+		// 頂点データの範囲をロックし、頂点バッファへのポインタを取得
+		g_pVtxBuffBattle_Player_MP->Lock(0, 0, (void**)&pVtx, 0);
+
+		//Leftside
+		// 頂点座標の設定
+		pVtx[0].pos.x = Left_MP_Pos.x; 
+		pVtx[0].pos.y =	Left_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Left_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[1].pos.y =	Left_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Left_MP_Pos.x; 
+		pVtx[2].pos.y =	Left_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Left_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[3].pos.y =	Left_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 0 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+
+pVtx+= 4;
+		//BG
+		// 頂点座標の設定
+		pVtx[0].pos.x = Entity_MP_Pos.x; 
+		pVtx[0].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Entity_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[1].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Entity_MP_Pos.x; 
+		pVtx[2].pos.y =	Entity_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Entity_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[3].pos.y =	Entity_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+
+pVtx+= 4;
+		//Entity
+		// 頂点座標の設定
+		pVtx[0].pos.x = Entity_MP_Pos.x; 
+		pVtx[0].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Entity_MP_Pos.x + nRecMPValue * fSize_per_MP_Value; 
+		pVtx[1].pos.y =	Entity_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Entity_MP_Pos.x; 
+		pVtx[2].pos.y =	Entity_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Entity_MP_Pos.x + nRecMPValue * fSize_per_MP_Value; 
+		pVtx[3].pos.y =	Entity_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE * MPColorType,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE * MPColorType + TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE * MPColorType,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE * MPColorType + TEXTURE_PLAYER_MP_CAGE_ENTITY_UNIT_SIZE,1.0f);
+
+pVtx+= 4;
+		//Outline
+		// 頂点座標の設定
+		pVtx[0].pos.x = OutLine_MP_Pos.x; 
+		pVtx[0].pos.y =	OutLine_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = OutLine_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[1].pos.y =	OutLine_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = OutLine_MP_Pos.x; 
+		pVtx[2].pos.y =	OutLine_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = OutLine_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_X; 
+		pVtx[3].pos.y =	OutLine_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 1 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+
+pVtx+= 4;
+		//Right
+		// 頂点座標の設定
+		pVtx[0].pos.x = Right_MP_Pos.x; 
+		pVtx[0].pos.y =	Right_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Right_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[1].pos.y =	Right_MP_Pos.y - BATTLE_PLAYER_MP_CAGE_SIZE;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Right_MP_Pos.x; 
+		pVtx[2].pos.y =	Right_MP_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Right_MP_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[3].pos.y =	Right_MP_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 2 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+pVtx+= 4;
+		//Light
+		// 頂点座標の設定
+		pVtx[0].pos.x = Right_MP_Light_Pos.x; 
+		pVtx[0].pos.y =	Right_MP_Light_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[0].pos.z = 0.0f;
+
+		pVtx[1].pos.x = Right_MP_Light_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[1].pos.y =	Right_MP_Light_Pos.y - BATTLE_PLAYER_MP_CAGE_ENTITY_SIZE_Y;
+		pVtx[1].pos.z = 0.0f;
+
+		pVtx[2].pos.x = Right_MP_Light_Pos.x; 
+		pVtx[2].pos.y =	Right_MP_Light_Pos.y;
+		pVtx[2].pos.z = 0.0f;
+
+		pVtx[3].pos.x = Right_MP_Light_Pos.x + BATTLE_PLAYER_MP_CAGE_SIZE; 
+		pVtx[3].pos.y =	Right_MP_Light_Pos.y;
+		pVtx[3].pos.z = 0.0f;
+
+		// rhwの設定
+		pVtx[0].rhw =
+			pVtx[1].rhw =
+			pVtx[2].rhw =
+			pVtx[3].rhw = 1.0f;
+
+		// 頂点カラーの設定
+		pVtx[0].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[1].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[2].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+		pVtx[3].col = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+
+		pVtx[0].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3,0.0f);
+		pVtx[1].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,0.0f);
+		pVtx[2].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3,1.0f);
+		pVtx[3].tex = D3DXVECTOR2(TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE * 3 + TEXTURE_PLAYER_MP_CAGE_CAGE_UNIT_SIZE,1.0f);
+		// 頂点データをアンロックする
+		g_pVtxBuffBattle_Player_MP->Unlock();
+}	
+
+
